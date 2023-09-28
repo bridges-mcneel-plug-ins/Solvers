@@ -4,28 +4,54 @@ using System.Collections.Generic;
 using GP = BRIDGES.Solvers.GuidedProjection;
 
 using GH_Types = Grasshopper.Kernel.Types;
-
+using System.Collections;
 
 namespace Solvers.Types.GPA
 {
     /// <summary>
-    /// Class defining a grasshopper type representing a <see cref="GP.VariableSet"/>.
+    /// Class defining a grasshopper type containing an indexed collection of <see cref="GP.Variable"/>.
     /// </summary>
-    public class Gh_Set : GH_Types.IGH_Goo
+    public class Gh_VariableSet :
+        IEnumerable<GP.Variable>,
+        GH_Types.IGH_Goo
     {
         #region Fields
 
         /// <summary>
-        /// List of components of the set variables.
+        /// Contains the set variables.
         /// </summary>
-        private List<double> _components;
+        private List<GP.Variable> _variables;
 
         #endregion
-
+        
         #region Properties
 
+        /// <summary>
+        /// Custom name of the set of variables.
+        /// </summary>
+        public string Name { get; private set; }
+
+
+        /// <summary>
+        /// Gets the number of variables in the set.
+        /// </summary>
+        public int Count => _variables.Count;
+
+        /// <summary>
+        /// Gets the variable at the given index in the set.
+        /// </summary>
+        /// <param name="index"> Index of the set variable to get. </param>
+        /// <returns> The variable at the given index in the set. </returns>
+        public GP.Variable this[int index] => _variables[index];
+
+
+        // ---------- Implement IGH_Goo ---------- //
+
         /// <inheritdoc cref="GH_Types.IGH_Goo.IsValid"/>
-        public bool IsValid => true;
+        public bool IsValid
+        {
+            get { return _variables is null ? false : _variables.Count != 0; }
+        }
 
         /// <inheritdoc cref="GH_Types.IGH_Goo.IsValidWhyNot"/>
         public string IsValidWhyNot
@@ -34,116 +60,85 @@ namespace Solvers.Types.GPA
             {
                 if (IsValid) { return string.Empty; }
 
-                return $"This {TypeName} is not valid, but I don't know why.";
+                return $"The variable set is null or empty.";
             }
         }
 
         /// <inheritdoc cref="GH_Types.IGH_Goo.TypeName"/>
-        public string TypeName => nameof(Gh_Set);
+        public string TypeName => nameof(Gh_VariableSet);
 
         /// <inheritdoc cref="GH_Types.IGH_Goo.TypeDescription"/>
-        public string TypeDescription => string.Format($"Grasshopper type representing a set of variables for the Guided Projection Algorithm.");
-
-
-        /// <summary>
-        /// Custom name of the setof variables.
-        /// </summary>
-        public string Name { get; private set; }
-
-        /// <summary>
-        /// Gets the unique ID of the set.
-        /// </summary>
-        public Guid GUID { get; private set; }
-
-        /// <summary>
-        /// Gets the common dimension of variables in the set.
-        /// </summary>
-        public int VariableDimension { get; private set; }
-
-        /// <summary>
-        /// Gets the number of variables in the set. 
-        /// </summary>
-        public int VariableCount => _components.Count / VariableDimension;
+        public string TypeDescription => string.Format($"Grasshopper type representing a collection of variables.");
 
         #endregion
 
         #region Constructors
 
         /// <summary>
-        /// Initialises a new instance of <see cref= "Gh_Set" /> class from another <see cref="Gh_Set"/>.
+        /// Initialises a new instance of <see cref= "Gh_VariableSet" /> class.
         /// </summary>
-        /// <param name="gh_VariableSet"> <see cref="Gh_Set"/> to duplicate. </param>
-        public Gh_Set(Gh_Set gh_VariableSet)
-        {
-            Name = gh_VariableSet.Name;
-            GUID = gh_VariableSet.GUID;
-            VariableDimension = gh_VariableSet.VariableDimension;
+        public Gh_VariableSet() { /* Do Nothing */ }
 
-            _components = new List<double>(gh_VariableSet._components);
+        /// <summary>
+        /// Initialises a new instance of <see cref= "Gh_VariableSet" /> class from another <see cref="Gh_VariableSet"/>.
+        /// </summary>
+        /// <param name="gh_VariableSet"> <see cref="Gh_VariableSet"/> to duplicate. </param>
+        public Gh_VariableSet(Gh_VariableSet gh_VariableSet)
+        {
+            _variables = new List<GP.Variable>(gh_VariableSet._variables);
+
+            Name = gh_VariableSet.Name;
         }
 
         /// <summary>
-        /// Initialises a new instance of <see cref= "Gh_Set" /> class from its id, components, variable dimension.
+        /// Initialises a new instance of <see cref= "Gh_VariableSet" /> class from an ordered collection of <see cref="GP.Variable"/>.
         /// </summary>
-        /// <param name="components"> Components of the set variables. </param>
-        /// <param name="dimension"> Common dimension of the variables in the set. </param>
-        /// <param name="name"> Name of the set of variable. </param>
-        public Gh_Set(IList<double> components, int dimension, string name)
+        /// <param name="variables"> Set variables. </param>
+        /// <param name="name"> Custom name of the set. </param>
+        public Gh_VariableSet(IReadOnlyList<GP.Variable> variables, string name)
         {
-            if(components is null) { throw new ArgumentNullException(nameof(components)); }
-            if(components.Count == 0 & dimension < 1 & (components.Count % dimension) != 0)
-            {
-                throw new ArgumentException("The number of components must be a non-zero multiple of the variable dimension.");
-            }
+            _variables = new List<GP.Variable>(variables);
 
             Name = name;
-            GUID = Guid.NewGuid();
-            VariableDimension = dimension;
-
-            _components = new List<double>(components);
         }
 
         #endregion
 
         #region Public Methods
 
-        /// <summary>
-        /// Returns the component at the given index in the set.
-        /// </summary>
-        /// <param name="componentIndex"> Index of the component to get. </param>
-        /// <returns> The component at the given index in the set. </returns>
-        internal double GetComponent(int componentIndex) => _components[componentIndex];
+        // ---------- Implement IEnumerable<.>---------- //
 
-        /// <summary>
-        /// Returns the components of the variable at the given index.
-        /// </summary>
-        /// <param name="variableIndex"> Index of the variable to get. </param>
-        /// <returns> The components of the variable at the index. </returns>
-        public double[] GetVariable(int variableIndex)
+        /// <inheritdoc cref="IEnumerable{T}.GetEnumerator"/>
+        public IEnumerator<GP.Variable> GetEnumerator()
         {
-            double[] variable = new double[VariableDimension];
-            int index = variableIndex * VariableDimension;
-
-            for (int i = 0; i < VariableDimension; i++)
+            for (int i = 0; i < Count; i++)
             {
-                variable[i] = _components[index + i];
+                yield return _variables[i];
             }
-
-            return variable;
         }
 
+        // ---------- Implement IGH_Goo ---------- //
 
         /// <inheritdoc cref="GH_Types.IGH_Goo.Duplicate()"/>
-        public GH_Types.IGH_Goo Duplicate() => new Gh_Set(this);
-
+        public GH_Types.IGH_Goo Duplicate() => new Gh_VariableSet(this);
 
         /// <inheritdoc cref="GH_Types.IGH_Goo.ScriptVariable()"/>
-        public object ScriptVariable() => _components;
+        public object ScriptVariable()
+        {
+            return (IReadOnlyList<GP.Variable>)_variables ; 
+        }
 
 
         /// <inheritdoc cref="GH_Types.IGH_Goo.CastFrom(object)"/>
         public bool CastFrom(object source)
         {
+            if (source == null) { return false; }
+
+            var type = source.GetType();
+
+
+            // ----- Otherwise ----- //
+
             return false;
         }
 
@@ -151,6 +146,9 @@ namespace Solvers.Types.GPA
         public bool CastTo<T>(out T target)
         {
             target = default;
+
+
+            // ----- Otherwise ----- //
 
             return false;
         }
@@ -172,13 +170,17 @@ namespace Solvers.Types.GPA
         #region Override : Object
 
         /// <inheritdoc cref="GH_Types.IGH_Goo.ToString()"/>
-        public override string ToString()
-        {
-            string text = Name is null ? "Set" : Name;
-            return text + $" (N:{VariableCount}, {VariableDimension}D)";
-        }
-            
+        public override string ToString() => Name is null ? $"Variable Set (C:{Count})" : $"{Name} (C:{Count})";
 
         #endregion
+
+
+        #region Explicit Implementation : IEnumerable
+
+        /// <inheritdoc cref="IEnumerable.GetEnumerator"/>
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        #endregion
+
     }
 }

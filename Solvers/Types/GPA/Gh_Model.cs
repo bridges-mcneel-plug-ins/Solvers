@@ -3,7 +3,7 @@
 using GP = BRIDGES.Solvers.GuidedProjection;
 
 using GH_Types = Grasshopper.Kernel.Types;
-
+using System.Collections.Generic;
 
 namespace Solvers.Types.GPA
 {
@@ -42,10 +42,10 @@ namespace Solvers.Types.GPA
 
         #region Override : GH_Goo<>
 
-        /********** Properties **********/
+        // ---------- Properties ----------//
 
         /// <inheritdoc cref="GH_Types.GH_Goo{T}.IsValid"/>
-        public override bool IsValid  => true;
+        public override bool IsValid => !(Value is null);
 
         /// <inheritdoc cref="GH_Types.GH_Goo{T}.TypeDescription"/>
         public override string TypeDescription => $"Grasshopper type containing a {typeof(GP.GuidedProjectionAlgorithm)}.";
@@ -54,13 +54,7 @@ namespace Solvers.Types.GPA
         public override string TypeName => nameof(Gh_Model);
 
 
-        /********** Methods **********/
-
-        /// <inheritdoc cref="GH_Types.GH_Goo{T}.ToString"/>
-        public override string ToString()
-        {
-            return $"(V:{Value.X.Size}, E:?, C:?)";
-        }
+        // ---------- Methods ---------- //
 
         /// <inheritdoc cref="GH_Types.GH_Goo{T}.Duplicate"/>
         public override GH_Types.IGH_Goo Duplicate() => new Gh_Model(this);
@@ -74,18 +68,7 @@ namespace Solvers.Types.GPA
             var type = source.GetType();
 
 
-            /******************** BRIDGES Objects ********************/
-
-            // Cast a GP.GuidedProjectionAlgorithm to a Gh_Model
-            if (typeof(GP.GuidedProjectionAlgorithm).IsAssignableFrom(type))
-            {
-                this.Value = (GP.GuidedProjectionAlgorithm)source;
-
-                return true;
-            }
-
-
-            /******************** Otherwise ********************/
+            // ----- Otherwise ----- //
 
             return false;
         }
@@ -93,19 +76,19 @@ namespace Solvers.Types.GPA
         /// <inheritdoc cref="GH_Types.GH_Goo{T}.CastTo{Q}(ref Q)"/>
         public override bool CastTo<T>(ref T target)
         {
-            /******************** BRIDGES Objects ********************/
-
-            // Casts a Gh_Model to a GP.GuidedProjectionAlgorithm
-            if (typeof(T).IsAssignableFrom(typeof(GP.GuidedProjectionAlgorithm)))
-            {
-                target = (T)(object)this.Value;
-
-                return true;
-            }
-
-            /******************** Otherwise ********************/
+            // ----- Otherwise ----- //
 
             return false;
+        }
+
+        #endregion
+
+        #region Override : Object
+
+        /// <inheritdoc cref="GH_Types.GH_Goo{T}.ToString"/>
+        public override string ToString()
+        {
+            return $"(V:{Value.ComponentCount}, E:{Value.EnergyCount}, C:{Value.ConstraintCount})";
         }
 
         #endregion

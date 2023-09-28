@@ -24,7 +24,7 @@
 	</Target>
 
 	<ItemGroup>
-		<PackageReference Include="BRIDGES.McNeel.Grasshopper-Dev" Version="0.1.2-beta" />
+		<PackageReference Include="BRIDGES.McNeel.Grasshopper-Dev" Version="0.1.4-beta" />
 	</ItemGroup>
 
 	<ItemGroup>

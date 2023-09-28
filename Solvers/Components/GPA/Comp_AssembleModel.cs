@@ -8,8 +8,11 @@ using Gh_Param_Euc3D = BRIDGES.McNeel.Grasshopper.Parameters.Geometry.Euclidean3
 
 using GH_Kernel = Grasshopper.Kernel;
 
+using Gh_Disp_Euc3D = BRIDGES.McNeel.Grasshopper.Display.Geometry.Euclidean3D;
+
 using Types_GPA = Solvers.Types.GPA;
 using Params_GPA = Solvers.Parameters.GPA;
+using Grasshopper.Documentation;
 
 
 namespace Solvers.Components.GPA
@@ -42,7 +45,7 @@ namespace Solvers.Components.GPA
         {
             pManager.AddParameter(new Params_GPA.Param_VariableSet(), "Sets", "S", "Sets of variable used by the energies and constraints.", GH_Kernel.GH_ParamAccess.list);
             pManager.AddParameter(new Params_GPA.Param_Energy(), "Energies", "E", "Energies", GH_Kernel.GH_ParamAccess.list);
-            pManager.AddParameter(new Params_GPA.Param_QuadraticConstraint(), "Constraints", "C", "Constraints", GH_Kernel.GH_ParamAccess.list);
+            pManager.AddParameter(new Params_GPA.Param_Constraint(), "Constraints", "C", "Constraints", GH_Kernel.GH_ParamAccess.list);
         }
 
         /// <inheritdoc cref="GH_Kernel.GH_Component.RegisterOutputParams(GH_OutputParamManager)"/>
@@ -54,86 +57,101 @@ namespace Solvers.Components.GPA
         /// <inheritdoc cref="GH_Kernel.GH_Component.SolveInstance(GH_Kernel.IGH_DataAccess)"/>
         protected override void SolveInstance(GH_Kernel.IGH_DataAccess DA)
         {
-            /******************** Initialisation ********************/
+            // ---------- Initialisation ---------- //
 
-            List<Types_GPA.Gh_Set> gh_Sets = null;
+            List<Types_GPA.Gh_VariableSet> gh_Sets = null;
             List<Types_GPA.Gh_Energy> gh_Energies = null;
-            List<Types_GPA.Gh_QuadraticConstraint> gh_Constraints = null;
+            List<Types_GPA.Gh_Constraint> gh_Constraints = null;
 
-            /******************** Get Inputs ********************/
+            // ---------- Get Inputs ---------- //
 
             if (!DA.GetDataList(0, gh_Sets)) { return; };
             if (!DA.GetDataList(1, gh_Energies)) { return; };
             if (!DA.GetDataList(2, gh_Constraints)) { return; };
 
-            /******************** Core ********************/
+            // ---------- Core ---------- //
+
+            int setVariableCount = 0;
+            foreach (Types_GPA.Gh_VariableSet gh_Set in gh_Sets)
+            {
+                setVariableCount += gh_Set.Count;
+            }
 
             GP.GuidedProjectionAlgorithm gpa = new GP.GuidedProjectionAlgorithm(1e-8, 100);
 
-            Dictionary<Guid, GP.VariableSet> dict_Set = new Dictionary<Guid, GP.VariableSet>(gh_Sets.Count);
-            foreach (Types_GPA.Gh_Set gh_Set in gh_Sets)
+
+            // ---------- Variables ---------- //
+
+            // Dictionary containing:
+            // - Key : Variable defined by the user before the creation of the model.
+            // - Value : Varriable defined from the gpa model.
+
+            foreach(Types_GPA.Gh_VariableSet gh_Set in gh_Sets)
             {
-                GP.VariableSet set = gpa.AddVariableSet(gh_Set.VariableCount, gh_Set.VariableCount);
-
-                for (int i = 0; i < gh_Set.VariableCount; i++)
+                foreach(GP.Variable userVariable in gh_Set)
                 {
-                    set.AddVariable(gh_Set.GetVariable(i));
-                }
+                    bool isVariableAdded = gpa.TryAddVariable(userVariable);
 
-                dict_Set.Add(gh_Set.GUID, set);
+                    if(!isVariableAdded)
+                    {
+                        this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Warning, $"The set {gh_Set.Name} contains a variable that was already added to the model.");
+                    }
+                }
             }
+
+            // ---------- Energies ---------- //
 
             foreach (Types_GPA.Gh_Energy gh_Energy in gh_Energies)
             {
-                int count = gh_Energy.Variables.Count;
-
-                List<(GP.VariableSet, int)> variables = new List<(GP.VariableSet, int)>(count);
-                for (int i = 0; i < count; i++)
+                IReadOnlyList<GP.Variable> variables = gh_Energy.Value.Variables;
+                foreach(GP.Variable variable in variables)
                 {
-                    Types_GPA.Gh_Variable gh_Variable = gh_Energy.Variables[i];
-                    variables.Add((dict_Set[gh_Variable.SetGuid], gh_Variable.Index));
-                    
+                    bool isVariableAdded = gpa.TryAddVariable(variable);
+                    if (isVariableAdded)
+                    {
+                        this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Remark, $"A variable which does not belong to any set was added to the model. It might be a dummy variable.");
+                    }
                 }
 
-                // To Do : Manage if silent variables are added :
-                // - set needs to be added to the model
-                // - variable needs to be added to to the energy variables
-
-                gpa.AddEnergy(gh_Energy.Type, variables, gh_Energy.Weight);
+                bool isEnergyAdded = gpa.TryAddEnergy(gh_Energy.Value);
+                if (!isEnergyAdded)
+                {
+                    this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Warning, $"This energy is a duplicate, it was already added to the model.");
+                }
             }
 
+            // ---------- Constraints ---------- //
 
-            foreach (Types_GPA.Gh_QuadraticConstraint gh_Constraint in gh_Constraints)
+            foreach (Types_GPA.Gh_Constraint gh_Constraint in gh_Constraints)
             {
-                int count = gh_Constraint.Variables.Count;
-
-                List<(GP.VariableSet, int)> variables = new List<(GP.VariableSet, int)>(count);
-                for (int i = 0; i < count; i++)
+                IReadOnlyList<GP.Variable> variables = gh_Constraint.Value.Variables;
+                foreach (GP.Variable variable in variables)
                 {
-                    Types_GPA.Gh_Variable gh_Variable = gh_Constraint.Variables[i];
-                    variables.Add((dict_Set[gh_Variable.SetGuid], gh_Variable.Index));
-
+                    bool isVariableAdded = gpa.TryAddVariable(variable);
+                    if (isVariableAdded)
+                    {
+                        this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Remark, $"A variable which does not belong to any set was added to the model. It might be a dummy variable.");
+                    }
                 }
 
-                // To Do :  Manage if silent variables are added :
-                // - set needs to be added to the model
-                // - variable needs to be added to to the energy variables
-
-
-                gpa.AddConstraint(gh_Constraint.Type, variables, gh_Constraint.Weight);
+                bool isConstraintAdded = gpa.TryAddConstraint(gh_Constraint.Value);
+                if (!isConstraintAdded)
+                {
+                    this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Warning, $"This constraint is a duplicate, it was already added to the model.");
+                }
             }
-
-
 
             /******************** Set Output ********************/
 
+            Types_GPA.Gh_Model gh_Model = new Types_GPA.Gh_Model(gpa);
             DA.SetData(0, gpa);
         }
 
         #endregion
 
-
         #region Override : GH_DocumentObject
+
+        // ---------- Properties ---------- //
 
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.ComponentGuid"/>
         public override Guid ComponentGuid => new Guid("{0DB58DA4-D469-4AF7-AC13-D9B630127B42}");
@@ -141,14 +159,17 @@ namespace Solvers.Components.GPA
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.Exposure"/>
         public override GH_Kernel.GH_Exposure Exposure => (GH_Kernel.GH_Exposure)TabExposure.Solver;
 
+
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.Icon"/>
         protected override System.Drawing.Bitmap Icon => null;
 
 
+        // ---------- Methods ---------- //
+
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.CreateAttributes()"/>
         public override void CreateAttributes()
         {
-            m_attributes = new ComponentAttributes(this);
+            m_attributes = new Gh_Disp_Euc3D.ComponentAttributes(this);
         }
 
         #endregion

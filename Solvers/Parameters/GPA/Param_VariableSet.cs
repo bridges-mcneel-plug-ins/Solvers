@@ -2,15 +2,17 @@
 
 using GH_Kernel = Grasshopper.Kernel;
 
+using Gh_Disp_Euc3D = BRIDGES.McNeel.Grasshopper.Display.Geometry.Euclidean3D;
+
 using Types_GPA = Solvers.Types.GPA;
 
 
 namespace Solvers.Parameters.GPA
 {
     /// <summary>
-    /// A <see cref="Types_GPA.Gh_Set"/> grasshopper parameter.
+    /// A <see cref="Types_GPA.Gh_VariableSet"/> grasshopper parameter.
     /// </summary>
-    public class Param_VariableSet : GH_Kernel.GH_Param<Types_GPA.Gh_Set>
+    public class Param_VariableSet : GH_Kernel.GH_Param<Types_GPA.Gh_VariableSet>
     {
         #region Properties
 
@@ -52,7 +54,7 @@ namespace Solvers.Parameters.GPA
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.CreateAttributes()"/>
         public override void CreateAttributes()
         {
-            m_attributes = new ParameterAttributes(this);
+            m_attributes = new Gh_Disp_Euc3D.ParameterAttributes(this);
         }
 
         #endregion

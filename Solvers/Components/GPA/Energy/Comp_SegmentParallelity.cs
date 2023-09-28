@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 
+using GP = BRIDGES.Solvers.GuidedProjection;
 using EnergyTypes = BRIDGES.Solvers.GuidedProjection.EnergyTypes;
 
 using Gh_Types_Euc3D = BRIDGES.McNeel.Grasshopper.Types.Geometry.Euclidean3D;
 using Gh_Params_Euc3D = BRIDGES.McNeel.Grasshopper.Parameters.Geometry.Euclidean3D;
+using Gh_Disp_Euc3D = BRIDGES.McNeel.Grasshopper.Display.Geometry.Euclidean3D;
 
 using GH_Kernel = Grasshopper.Kernel;
 
@@ -82,11 +84,13 @@ namespace Solvers.Components.GPA.Energy
             /* To Do : Verify that start, end and vector have the same dimentsion. */
 
             double[] components = new double[] { vector.Value.X, vector.Value.Y, vector.Value.Z };
-            EnergyTypes.SegmentParallelity energy = new EnergyTypes.SegmentParallelity(components);
+            EnergyTypes.SegmentParallelity energyType = new EnergyTypes.SegmentParallelity(components);
 
-            List<Types_GPA.Gh_Variable> variables = new List<Types_GPA.Gh_Variable>() { start, end, length };
+            List<GP.Variable> variables = new List<GP.Variable>() { start.Value, end.Value, length.Value };
 
-            Types_GPA.Gh_Energy gh_Energy = new Types_GPA.Gh_Energy(energy, variables, weight);
+            GP.Energy energy = new GP.Energy(energyType, variables, weight);
+
+            Types_GPA.Gh_Energy gh_Energy = new Types_GPA.Gh_Energy(energy);
 
             /******************** Set Output ********************/
 
@@ -110,7 +114,7 @@ namespace Solvers.Components.GPA.Energy
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.CreateAttributes()"/>
         public override void CreateAttributes()
         {
-            m_attributes = new ComponentAttributes(this);
+            m_attributes = new Gh_Disp_Euc3D.ComponentAttributes(this);
         }
 
         #endregion

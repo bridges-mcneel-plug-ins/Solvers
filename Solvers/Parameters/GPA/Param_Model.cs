@@ -2,6 +2,8 @@
 
 using GH_Kernel = Grasshopper.Kernel;
 
+using Gh_Disp_Euc3D = BRIDGES.McNeel.Grasshopper.Display.Geometry.Euclidean3D;
+
 using Types_GPA = Solvers.Types.GPA;
 
 
@@ -52,7 +54,7 @@ namespace Solvers.Parameters.GPA
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.CreateAttributes()"/>
         public override void CreateAttributes()
         {
-            m_attributes = new ParameterAttributes(this);
+            m_attributes = new Gh_Disp_Euc3D.ParameterAttributes(this);
         }
 
         #endregion

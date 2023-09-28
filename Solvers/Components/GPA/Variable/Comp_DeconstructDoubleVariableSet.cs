@@ -5,14 +5,16 @@ using GP = BRIDGES.Solvers.GuidedProjection;
 
 using GH_Kernel = Grasshopper.Kernel;
 
-using Typ = Solvers.Types.GPA;
-using Param = Solvers.Parameters.GPA;
+using Gh_Disp_Euc3D = BRIDGES.McNeel.Grasshopper.Display.Geometry.Euclidean3D;
+
+using S_Types = Solvers.Types.GPA;
+using S_Param = Solvers.Parameters.GPA;
 
 
 namespace Solvers.Components.GPA
 {
     /// <summary>
-    /// A grasshopper component disassembling a <see cref="GP.VariableSet"/> into its <see cref="double"/> variables.
+    /// A grasshopper component disassembling a <see cref="S_Types.Gh_VariableSet"/> into its <see cref="double"/> variables.
     /// </summary>
     public class Comp_DeconstructDoubleVariableSet : GH_Kernel.GH_Component
     {
@@ -37,7 +39,7 @@ namespace Solvers.Components.GPA
         /// <inheritdoc cref="GH_Kernel.GH_Component.RegisterInputParams(GH_InputParamManager)"/>
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddParameter(new Param.Param_VariableSet(), "Variable Set", "S", "Variable set to disassemble into numerical values.", GH_Kernel.GH_ParamAccess.item);
+            pManager.AddParameter(new S_Param.Param_VariableSet(), "Variable Set", "S", "Variable set to disassemble into numerical values.", GH_Kernel.GH_ParamAccess.item);
         }
 
         /// <inheritdoc cref="GH_Kernel.GH_Component.RegisterOutputParams(GH_OutputParamManager)"/>
@@ -51,20 +53,20 @@ namespace Solvers.Components.GPA
         {
             /******************** Initialisation ********************/
 
-            Typ.Gh_Set set = null;
+            S_Types.Gh_VariableSet gh_Set = null;
 
             /******************** Get Inputs ********************/
 
-            if (!DA.GetData(0, ref set)) { return; };
+            if (!DA.GetData(0, ref gh_Set)) { return; };
 
             /******************** Core ********************/
-
-            int variableCount = set.VariableCount;
-
-            List<double> components = new List<double>(variableCount);
-            for (int i = 0; i < variableCount; i++)
+                        
+            List<double> components = new List<double>(gh_Set.Count);
+            for (int i = 0; i < gh_Set.Count; i++)
             {
-                components.Add(set.GetComponent(i));
+                GP.Variable variable = gh_Set[i];
+
+                components.Add(variable[0]);
             }
             
             /******************** Set Output ********************/
@@ -100,7 +102,7 @@ namespace Solvers.Components.GPA
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.CreateAttributes()"/>
         public override void CreateAttributes()
         {
-            m_attributes = new ComponentAttributes(this);
+            m_attributes = new Gh_Disp_Euc3D.ComponentAttributes(this);
         }
 
         #endregion

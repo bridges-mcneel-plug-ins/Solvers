@@ -4,37 +4,39 @@ using System.Collections.Generic;
 using GP = BRIDGES.Solvers.GuidedProjection;
 
 using GH_Types = Grasshopper.Kernel.Types;
+using Eto.Forms;
+
 
 namespace Solvers.Types.GPA
 {
     /// <summary>
     /// Class defining a grasshopper type, which represents an energy.
     /// </summary>
-    public class Gh_Energy : GH_Types.GH_Goo<GP.Energy>
+    public class Gh_Constraint : GH_Types.GH_Goo<GP.Constraint>
     {
         #region Constructors
 
         /// <summary>
-        /// Initialises a new instance of <see cref= "Gh_Energy" /> class.
+        /// Initialises a new instance of <see cref= "Gh_Constraint" /> class.
         /// </summary>
-        public Gh_Energy() { /* Do Nothing */ }
-
+        public Gh_Constraint() { /* Do Nothing */ }
+        
         /// <summary>
-        /// Initialises a new instance of <see cref= "Gh_Energy" /> class from another <see cref="Gh_Energy"/>.
+        /// Initialises a new instance of <see cref= "Gh_Constraint" /> class from another <see cref="Gh_Constraint"/>.
         /// </summary>
-        /// <param name="gh_Energy"> <see cref="Gh_Energy"/> to duplicate. </param>
-        public Gh_Energy(Gh_Energy gh_Energy)
+        /// <param name="gh_Constraint"> <see cref="Gh_Constraint"/> to duplicate. </param>
+        public Gh_Constraint(Gh_Constraint gh_Constraint)
         {
-            this.Value = gh_Energy.Value;
+            this.Value = gh_Constraint.Value;
         }
 
         /// <summary>
-        /// Initialises a new instance of <see cref= "Gh_Energy" /> class from a <see cref="GP.Energy"/>.
+        /// Initialises a new instance of <see cref= "Gh_Constraint" /> class from another <see cref="Gh_Constraint"/>.
         /// </summary>
-        /// <param name="energy"> <see cref="GP.Energy"/> to store. </param>
-        public Gh_Energy(GP.Energy energy)
+        /// <param name="constraint"> <see cref="GP.Constraint"/> to store. </param>
+        public Gh_Constraint(GP.Constraint constraint)
         {
-            this.Value = energy;
+            this.Value = constraint;
         }
 
         #endregion
@@ -48,10 +50,10 @@ namespace Solvers.Types.GPA
         public override bool IsValid => !(Value is null);
 
         /// <inheritdoc cref="GH_Types.GH_Goo{T}.TypeDescription"/>
-        public override string TypeDescription { get { return String.Format($"Grasshopper type containing a {typeof(GP.Energy)}."); } }
+        public override string TypeDescription { get { return String.Format($"Grasshopper type containing a {typeof(GP.Constraint)}."); } }
 
         /// <inheritdoc cref="GH_Types.GH_Goo{T}.TypeName"/>
-        public override string TypeName { get { return nameof(Gh_Energy); } }
+        public override string TypeName { get { return nameof(Gh_Constraint); } }
 
 
         // ---------- Methods ---------- //
@@ -59,7 +61,7 @@ namespace Solvers.Types.GPA
         /// <inheritdoc cref="GH_Types.GH_Goo{T}.Duplicate"/>
         public override GH_Types.IGH_Goo Duplicate()
         {
-            return new Gh_Energy(this);
+            return new Gh_Constraint(this);
         }
 
 
@@ -72,13 +74,14 @@ namespace Solvers.Types.GPA
 
             // ----- BRIDGES Objects ----- //
 
-            // Cast a GP.Energy to a Gh_Energy
-            if (typeof(GP.Energy).IsAssignableFrom(type))
+            // Cast a GP.Constraint to a Gh_Constraint
+            if (typeof(GP.Constraint).IsAssignableFrom(type))
             {
-                this.Value = (GP.Energy)source;
+                this.Value = (GP.Constraint)source;
 
                 return true;
             }
+
 
             // ----- Otherwise ----- //
 
@@ -90,11 +93,11 @@ namespace Solvers.Types.GPA
         {
             // ----- BRIDGES Objects ----- //
 
-            // Casts a Gh_Energy to a GP.Energy
-            if (typeof(T).IsAssignableFrom(typeof(GP.Energy)))
+            // Casts a Gh_Constraint to a GP.Constraint
+            if (typeof(T).IsAssignableFrom(typeof(GP.Constraint)))
             {
-                object energy = this.Value;
-                target = (T)energy;
+                object constraint = this.Value;
+                target = (T)constraint;
 
                 return true;
             }
@@ -109,7 +112,7 @@ namespace Solvers.Types.GPA
         #region Override : Object
 
         /// <inheritdoc cref="GH_Types.GH_Goo{T}.ToString"/>
-        public override string ToString() => $"Energy (T:{Value.Type})";
+        public override string ToString() => $"Constraint (T:{Value.Type})";
 
         #endregion
     }
@@ -118,7 +121,7 @@ namespace Solvers.Types.GPA
         /// <summary>
         /// Class defining a grasshopper type, which represents an energy.
         /// </summary>
-        public class Gh_Energy : GH_Types.IGH_Goo
+        public class Gh_Constraint : GH_Types.IGH_Goo
         {
             #region Properties
 
@@ -137,24 +140,24 @@ namespace Solvers.Types.GPA
             }
 
             /// <inheritdoc cref="GH_Types.IGH_Goo.TypeName"/>
-            public string TypeName => nameof(Gh_Energy);
+            public string TypeName => nameof(Gh_Constraint);
 
             /// <inheritdoc cref="GH_Types.IGH_Goo.TypeDescription"/>
-            public string TypeDescription => string.Format($"Grasshopper type representing an energy for the Guided Projection Algorithm.");
+            public string TypeDescription => string.Format($"Grasshopper type representing a quadratic constraint for the Guided Projection Algorithm.");
 
 
             /// <summary>
-            /// Type of the energy.
+            /// Type of the quadratic constraint.
             /// </summary>
-            public GP.Interfaces.IEnergyType Type { get; private set; }
+            public GP.Interfaces.IQuadraticConstraintType Type { get; private set; }
 
             /// <summary>
-            /// Variables for the energy.
+            /// Variables for the quadratic constraint.
             /// </summary>
             public List<Gh_Variable> Variables { get; private set; }
 
             /// <summary>
-            /// Weight of the energy.
+            /// Weight of the quadratic constraint.
             /// </summary>
             public double Weight { get; private set; }
 
@@ -163,24 +166,24 @@ namespace Solvers.Types.GPA
             #region Constructors
 
             /// <summary>
-            /// Initialises a new instance of <see cref= "Gh_Energy" /> class from another <see cref="Gh_Energy"/>.
+            /// Initialises a new instance of <see cref= "Gh_Constraint" /> class from another <see cref="Gh_Constraint"/>.
             /// </summary>
-            /// <param name="gh_Energy"> <see cref="Gh_Energy"/> to duplicate. </param>
-            public Gh_Energy(Gh_Energy gh_Energy)
+            /// <param name="gh_QuadraticConstraint"> <see cref="Gh_Constraint"/> to duplicate. </param>
+            public Gh_Constraint(Gh_Constraint gh_QuadraticConstraint)
             {
-                this.Type = gh_Energy.Type;
-                this.Variables = new List<Gh_Variable>(gh_Energy.Variables);
+                this.Type = gh_QuadraticConstraint.Type;
+                this.Variables = new List<Gh_Variable>(gh_QuadraticConstraint.Variables);
 
-                this.Weight = gh_Energy.Weight;
+                this.Weight = gh_QuadraticConstraint.Weight;
             }
 
             /// <summary>
-            /// Initialises a new instance of <see cref= "Gh_Energy" /> class from its name, id, components and variable dimension.
+            /// Initialises a new instance of <see cref= "Gh_Constraint" /> class from its name, id, components and variable dimension.
             /// </summary>
-            /// <param name="type"> Type of the energy. </param>
-            /// <param name="variables"> Variables for the energy. </param>
-            /// <param name="weight"> Weight of the energy. </param>
-            public Gh_Energy(GP.Interfaces.IEnergyType type, List<Gh_Variable> variables, double weight)
+            /// <param name="type"> Type of the quadratic constraint. </param>
+            /// <param name="variables"> Variables for the quadratic constraint. </param>
+            /// <param name="weight"> Weight of the quadratic constraint. </param>
+            public Gh_Constraint(GP.Interfaces.IQuadraticConstraintType type, List<Gh_Variable> variables, double weight)
             {
                 this.Type = type;
                 this.Variables = new List<Gh_Variable>(variables);
@@ -193,7 +196,7 @@ namespace Solvers.Types.GPA
             #region Public Methods
 
             /// <inheritdoc cref="GH_Types.IGH_Goo.Duplicate()"/>
-            public GH_Types.IGH_Goo Duplicate() => new Gh_Energy(this);
+            public GH_Types.IGH_Goo Duplicate() => new Gh_Constraint(this);
 
 
             /// <inheritdoc cref="GH_Types.IGH_Goo.ScriptVariable()"/>

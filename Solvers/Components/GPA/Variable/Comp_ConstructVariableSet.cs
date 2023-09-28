@@ -5,21 +5,21 @@ using System.Windows.Forms;
 using GP = BRIDGES.Solvers.GuidedProjection;
 using Euc3D = BRIDGES.Geometry.Euclidean3D;
 
-using Gh_Types_Euc3D = BRIDGES.McNeel.Grasshopper.Types.Geometry.Euclidean3D;
-
 using GH_Kernel = Grasshopper.Kernel;
 using GH_Data = Grasshopper.Kernel.Data;
 using GH_Types = Grasshopper.Kernel.Types;
 using GH_Param = Grasshopper.Kernel.Parameters;
 
+using Gh_Types_Euc3D = BRIDGES.McNeel.Grasshopper.Types.Geometry.Euclidean3D;
+using Gh_Disp_Euc3D = BRIDGES.McNeel.Grasshopper.Display.Geometry.Euclidean3D;
+
 using S_Types = Solvers.Types.GPA;
 using S_Param = Solvers.Parameters.GPA;
-
 
 namespace Solvers.Components.GPA.Variable
 {
     /// <summary>
-    /// A grasshopper component creating a <see cref="S_Types.Gh_Set"/>.
+    /// A grasshopper component creating a <see cref="S_Types.Gh_VariableSet"/>.
     /// </summary>
     public class Comp_ConstructVariableSet : GH_Kernel.GH_Component
     {
@@ -33,7 +33,7 @@ namespace Solvers.Components.GPA.Variable
         }
 
         #region Fields
-
+        
         /// <summary>
         /// State of the component.
         /// </summary>
@@ -65,7 +65,7 @@ namespace Solvers.Components.GPA.Variable
 
         #region Methods
 
-        /******************** For Message Handling ********************/
+        // ---------- For Message Handling ---------- //
 
         private void OnParameterSourceChanged(object sender, GH_Kernel.GH_ParamServerEventArgs e)
         {
@@ -75,8 +75,9 @@ namespace Solvers.Components.GPA.Variable
             if (index == 1 & this.Params.Input[index].SourceCount == 0) { Message = null; }
         }
 
-        /******************** For Component Mutation ********************/
-        
+
+        // ---------- For Component Mutation ---------- //
+
         /// <summary>
         /// Method called when the selected item in the Component Menu is changed.
         /// </summary>
@@ -151,43 +152,45 @@ namespace Solvers.Components.GPA.Variable
 
         }
 
-        /******************** For SolveInstance ********************/
+
+        // ---------- For SolveInstance ---------- //
 
         /// <summary>
         /// This function will be called (successively) from within the SolveInstance method of this component if the component <see cref="_configuration"/> is <see cref="ComponentConfiguration.Generic"/>.
         /// </summary>
         /// <param name="DA"> Data Access object. Use this object to retrieve data from input parameters and assign data to output parameters. </param>
+        /// <exception cref="InvalidCastException"> "The input could not be casted to GH_Number." </exception>
+        /// <exception cref="ArgumentNullException"> The input containing the values is null. </exception>
         /// <exception cref="ArgumentException"> The generic variable do not have the same dimension. All the variables of a set must have the same dimension. </exception>
-        private void SolveInstance_Generic(GH_Kernel.IGH_DataAccess DA)
+        private List<GP.Variable> CreateSet_Generic(GH_Kernel.IGH_DataAccess DA)
         {
-            /******************** Get Inputs ********************/
+            // ----- Get Inputs ----- //
 
-            string name = null;
-            DA.GetData(0, ref name);
-
-            if (!DA.GetDataTree(1, out GH_Data.GH_Structure<GH_Types.GH_Number> variables)) { return; };
+            if (!DA.GetDataTree(1, out GH_Data.GH_Structure<GH_Types.GH_Number> tree_Numbers))  {  return null; };
             // GetDataTree does not throw an exception if the conversion failed, but changes a Runtime Message Level.
             // To avoid any NullReferenceException, the level of the Runtime Message is checked.
-            if (this.RuntimeMessageLevel == GH_Kernel.GH_RuntimeMessageLevel.Error) { return; }
-
-            /******************** Core ********************/
-
-            double[] components;
-            int variableCount, variableDimension;
-
-            // The input Gh_Structure is actually a list.
-            // Each variable corresponds to an item in the list.
-            if (variables.Branches.Count == 1)
+            if (this.RuntimeMessageLevel == GH_Kernel.GH_RuntimeMessageLevel.Error)
             {
-                variableCount = variables[0].Count;
-                variableDimension = 1;
+                throw new InvalidCastException("The input could not be casted to GH_Number.");
+            }
 
-                components = new double[variableCount * variableDimension];
+            // ----- Core ----- //
 
-                List<GH_Types.GH_Number> branch = variables[0];
-                for (int i = 0; i < variableCount; i++)
+            List<GP.Variable> variables;
+
+            // Verifications
+            if (tree_Numbers.IsEmpty) { throw new ArgumentNullException(nameof(tree_Numbers), "The input containing the values is null."); }
+
+            // If the input Gh_Structure is actually a list, then each variable corresponds to an item in the list.
+            if (tree_Numbers.Branches.Count == 1)
+            {
+                variables = new List<GP.Variable>(tree_Numbers.DataCount);
+
+                List<GH_Types.GH_Number> branch = tree_Numbers[0];
+                for (int i = 0; i < branch.Count; i++)
                 {
-                    components[i] = branch[i].Value;
+                    GP.Variable variable = new GP.Variable(branch[i].Value);
+                    variables.Add(variable);
                 }
             }
 
@@ -195,31 +198,31 @@ namespace Solvers.Components.GPA.Variable
             // Each variable corresponds to a branch, and the variable components corresponds to the items in the branch.
             else
             {
-                variableCount = variables.Branches.Count;
-                variableDimension = variables[0].Count;
+                int variableCount = tree_Numbers.Branches.Count;
+                int variableDimension = tree_Numbers[0].Count;
+                variables = new List<GP.Variable>(variableCount);
 
-                components = new double[variableCount * variableDimension];
-                for (int i = 0; i < variableCount; i++)
+                for (int i_Var = 0; i_Var < variableCount; i_Var++)
                 {
-                    List<GH_Types.GH_Number> branch = variables[i];
+                    List<GH_Types.GH_Number> branch = tree_Numbers[i_Var];
+
                     if (branch.Count != variableDimension)
                     {
                         throw new ArgumentException("The generic variable do not have the same dimension. All the variables of a set must have the same dimension.");
                     }
 
-                    for (int j = 0; j < variableDimension; j++)
-                    {
-                        components[(i * variableDimension) + j] = branch[j].Value;
-                    }
+                    double[] components = new double[variableDimension];
+                    for (int i_Comp = 0; i_Comp < variableDimension; i_Comp++) { components[i_Comp] = branch[i_Comp].Value; }
+
+                    GP.Variable variable = new GP.Variable(components);
+                    variables.Add(variable);
                 }
             }
 
-            S_Types.Gh_Set set = new S_Types.Gh_Set(components, variableDimension, name);
-
             /******************** Set Output ********************/
-            
-            DA.SetData(0, set);
+
             Message = "Generic";
+            return variables;
         }
 
         /// <summary>
@@ -227,230 +230,124 @@ namespace Solvers.Components.GPA.Variable
         /// </summary>
         /// <param name="DA"> Data Access object. Use this object to retrieve data from input parameters and assign data to output parameters. </param>
         /// <exception cref="ArgumentException"> The generic variable do not have the same dimension. All the variables of a set must have the same dimension. </exception>
-        private void SolveInstance_BRIDGES(GH_Kernel.IGH_DataAccess DA)
+        private List<GP.Variable> CreateSet_BRIDGES(GH_Kernel.IGH_DataAccess DA)
         {
             /******************** Get Inputs ********************/
 
-            string name = null;
-            List<GH_Types.IGH_Goo> variables = new List<GH_Types.IGH_Goo>();
+            List<GH_Types.IGH_Goo> inputs = new List<GH_Types.IGH_Goo>();
 
             /******************** Get Inputs ********************/
 
-            DA.GetData(0, ref name);
-            if (!DA.GetDataList(1, variables) || variables.Count == 0) { return; };
+            if (!DA.GetDataList(1, inputs) || inputs.Count == 0) { return null; };
 
             /******************** Core ********************/
 
-            S_Types.Gh_Set set = null;
-            GH_Types.IGH_Goo firstVariable = variables[0];
+            List<GP.Variable> variables;
+
+            GH_Types.IGH_Goo input = inputs[0];
+
+            GH_Types.GH_Number gh_Number = new GH_Types.GH_Number(0);
+            Gh_Types_Euc3D.Gh_Point gh_Point = new Gh_Types_Euc3D.Gh_Point();
+            Gh_Types_Euc3D.Gh_Vector gh_Vector = new Gh_Types_Euc3D.Gh_Vector();
 
             // System types
-            if (firstVariable.GetType() == typeof(GH_Types.GH_String))
+            if (gh_Number.CastFrom(input))
             {
-                Message = "String";
-                set = CreateSet_FromString(variables, name);
-                DA.SetData(0, set);
-                return;
-            }
-            if (firstVariable.GetType() == typeof(GH_Types.GH_Number))
-            {
+                variables = CreateSet_FromGHDouble(inputs);
                 Message = "Double";
-                set = CreateSet_FromDouble(variables, name);
-                DA.SetData(0, set);
-                return;
             }
-
             // BRIDGES types
-            if (firstVariable.GetType() == typeof(Gh_Types_Euc3D.Gh_Point))
+            else if (gh_Point.CastFrom(input))
             {
+                variables = CreateSet_FromGhPoint(inputs);
                 Message = "Point";
-                set = CreateSet_FromGhPoint(variables, name);
-                DA.SetData(0, set);
-                return;
             }
-            else if (firstVariable.GetType() == typeof(Gh_Types_Euc3D.Gh_Vector))
+            else if (gh_Vector.CastFrom(input))
             {
+                variables = CreateSet_FromGhVector(inputs);
                 Message = "Vector";
-                set = CreateSet_FromGhVector(variables, name);
-                DA.SetData(0, set);
-                return;
             }
+            else { variables = null; }
 
-            // Types convertible to BRIDGES types
-            Gh_Types_Euc3D.Gh_Point gh_Point = new Gh_Types_Euc3D.Gh_Point();
-            if (gh_Point.CastFrom(firstVariable))
-            {
-                Message = "Point";
-                set = CreateSet_FromGHPoint(variables, name);
-                DA.SetData(0, set);
-                return;
-            }
-            Gh_Types_Euc3D.Gh_Vector gh_Vector = new Gh_Types_Euc3D.Gh_Vector();
-            if (gh_Vector.CastFrom(firstVariable))
-            {
-                Message = "Vector";
-                set = CreateSet_FromGHVector(variables, name);
-                DA.SetData(0, set);
-                return;
-            }
+            return variables;
         }
 
-        #region For SolveInstance_BRIDGES
 
-        /// <summary>
-        /// Create the set of variables from a list of <see cref="GH_Types.GH_String"/>
-        /// </summary>
-        /// <param name="variables"> Variables from which to get the components. </param>
-        /// <param name="name"> Name of the set to create. </param>
-        /// <returns></returns>
-        private S_Types.Gh_Set CreateSet_FromString(List<GH_Types.IGH_Goo> variables, string name)
-        {
-            int count = variables.Count;
-            int dimension = 1;
-
-            double[] components = new double[count * dimension];
-            for (int i = 0; i < variables.Count; i++)
-            {
-                GH_Types.GH_String gh_String = (GH_Types.GH_String)variables[i];
-                components[i] = Convert.ToDouble(gh_String.Value);
-            }
-
-            return new S_Types.Gh_Set(components, dimension, name);
-        }
+        #region For CreateSet_BRIDGES
 
         /// <summary>
         /// Create the set of variables from a list of <see cref="GH_Types.GH_Number"/>
         /// </summary>
-        /// <param name="variables"> Variables from which to get the components. </param>
-        /// <param name="name"> Name of the set to create. </param>
+        /// <param name="inputs"> Variables from which to get the components. </param>
         /// <returns></returns>
-        private S_Types.Gh_Set CreateSet_FromDouble(List<GH_Types.IGH_Goo> variables, string name)
+        private List<GP.Variable> CreateSet_FromGHDouble(List<GH_Types.IGH_Goo> inputs)
         {
-            int count = variables.Count;
-            int dimension = 1;
+            List<GP.Variable> variables = new List<GP.Variable>(inputs.Count);
 
-            double[] components = new double[count * dimension];
-            for (int i = 0; i < variables.Count; i++)
+            GH_Types.GH_Number gh_Number = new GH_Types.GH_Number(0);
+            for (int i = 0; i < inputs.Count; i++)
             {
-                GH_Types.GH_Number gh_Number = (GH_Types.GH_Number)variables[i];
-                components[i] = gh_Number.Value;
+                gh_Number.CastFrom(inputs[i]);
+
+                GP.Variable variable = new GP.Variable(gh_Number.Value);
+
+                variables.Add(variable);
             }
 
-            return new S_Types.Gh_Set(components, dimension, name);
+            return variables;
         }
 
 
         /// <summary>
         /// Create the set of variables from a list of <see cref="Gh_Types_Euc3D.Gh_Point"/>
         /// </summary>
-        /// <param name="variables"> Variables from which to get the components. </param>
-        /// <param name="name"> Name of the set to create. </param>
+        /// <param name="inputs"> Variables from which to get the components. </param>
         /// <returns></returns>
-        private S_Types.Gh_Set CreateSet_FromGhPoint(List<GH_Types.IGH_Goo> variables, string name)
+        private List<GP.Variable> CreateSet_FromGhPoint(List<GH_Types.IGH_Goo> inputs)
         {
-            int count = variables.Count;
-            int dimension = 3;
+            List<GP.Variable> variables = new List<GP.Variable>(inputs.Count);
 
-            double[] components = new double[count * dimension];
-            for (int i = 0; i < variables.Count; i++)
+            Gh_Types_Euc3D.Gh_Point gh_Point = new Gh_Types_Euc3D.Gh_Point();
+            for (int i = 0; i < inputs.Count; i++)
             {
-                Gh_Types_Euc3D.Gh_Point gh_Point = (Gh_Types_Euc3D.Gh_Point)variables[i];
+                gh_Point.CastFrom(inputs[i]);
 
-                int index = i * dimension;
-                components[index] = gh_Point.Value.X;
-                components[index + 1] = gh_Point.Value.Y;
-                components[index + 2] = gh_Point.Value.Z;
+                GP.Variable variable = new GP.Variable(gh_Point.Value.X, gh_Point.Value.Y, gh_Point.Value.Z);
+
+                variables.Add(variable);
             }
 
-            return new S_Types.Gh_Set(components, dimension, name);
+            return variables;
         }
 
         /// <summary>
         /// Create the set of variables from a list of <see cref="Gh_Types_Euc3D.Gh_Vector"/>
         /// </summary>
-        /// <param name="variables"> Variables from which to get the components. </param>
-        /// <param name="name"> Name of the set to create. </param>
+        /// <param name="inputs"> Variables from which to get the components. </param>
         /// <returns></returns>
-        private S_Types.Gh_Set CreateSet_FromGhVector(List<GH_Types.IGH_Goo> variables, string name)
+        private List<GP.Variable> CreateSet_FromGhVector(List<GH_Types.IGH_Goo> inputs)
         {
-            int count = variables.Count;
-            int dimension = 3;
+            List<GP.Variable> variables = new List<GP.Variable>(inputs.Count);
 
-            double[] components = new double[count * dimension];
-            for (int i = 0; i < variables.Count; i++)
-            {
-                Gh_Types_Euc3D.Gh_Vector gh_Vector = (Gh_Types_Euc3D.Gh_Vector)variables[i];
-
-                int index = i * dimension;
-                components[index] = gh_Vector.Value.X;
-                components[index + 1] = gh_Vector.Value.Y;
-                components[index + 2] = gh_Vector.Value.Z;
-            }
-
-            return new S_Types.Gh_Set(components, dimension, name);
-        }
-
-
-        /// <summary>
-        /// Create the set of variables from a list of variables convertible to <see cref="Gh_Types_Euc3D.Gh_Point"/>
-        /// </summary>
-        /// <param name="variables"> Variables from which to get the components. </param>
-        /// <param name="name"> Name of the set to create. </param>
-        /// <returns></returns>
-        private S_Types.Gh_Set CreateSet_FromGHPoint(List<GH_Types.IGH_Goo> variables, string name)
-        {
-            int count = variables.Count;
-            int dimension = 3;
-
-            double[] components = new double[count * dimension];
-            Gh_Types_Euc3D.Gh_Point gh_Point = new Gh_Types_Euc3D.Gh_Point();
-            for (int i = 0; i < variables.Count; i++)
-            {
-                gh_Point.CastFrom(variables[i]);
-
-                int index = i * dimension;
-                components[index] = gh_Point.Value.X;
-                components[index + 1] = gh_Point.Value.Y;
-                components[index + 2] = gh_Point.Value.Z;
-            }
-
-            return new S_Types.Gh_Set(components, dimension, name);
-        }
-
-
-        /// <summary>
-        /// Create the set of variables from a list of variables convertible to <see cref="Gh_Types_Euc3D.Gh_Vector"/>
-        /// </summary>
-        /// <param name="variables"> Variables from which to get the components. </param>
-        /// <param name="name"> Name of the set to create. </param>
-        /// <returns></returns>
-        private S_Types.Gh_Set CreateSet_FromGHVector(List<GH_Types.IGH_Goo> variables, string name)
-        {
-            int count = variables.Count;
-            int dimension = 3;
-
-            double[] components = new double[count * dimension];
             Gh_Types_Euc3D.Gh_Vector gh_Vector = new Gh_Types_Euc3D.Gh_Vector();
-            for (int i = 0; i < variables.Count; i++)
+            for (int i = 0; i < inputs.Count; i++)
             {
-                gh_Vector.CastFrom(variables[i]);
+                gh_Vector.CastFrom(inputs[i]);
 
-                int index = i * dimension;
-                components[index] = gh_Vector.Value.X;
-                components[index + 1] = gh_Vector.Value.Y;
-                components[index + 2] = gh_Vector.Value.Z;
+                GP.Variable variable = new GP.Variable(gh_Vector.Value.X, gh_Vector.Value.Y, gh_Vector.Value.Z);
+
+                variables.Add(variable);
             }
 
-            return new S_Types.Gh_Set(components, dimension, name);
+            return variables;
         }
-        #endregion
 
+        #endregion
 
         #endregion
 
 
         #region Override : GH_Component
-
 
         /// <inheritdoc cref="GH_Kernel.GH_Component.IsPreviewCapable"/>
         public override bool IsPreviewCapable => false;
@@ -470,14 +367,6 @@ namespace Solvers.Components.GPA.Variable
             // Activate the checking of the mode.
             item_Generic.CheckOnClick = true;
             item_BRIDGES.CheckOnClick = true;
-        }
-
-        /// <inheritdoc cref="GH_Kernel.GH_Component.AppendAdditionalMenuItems(ToolStripDropDown)"/>
-        public override void AppendAdditionalMenuItems(ToolStripDropDown menu)
-        {
-            base.AppendAdditionalMenuItems(menu);
-
-            Menu_AppendItem(menu, "MyNewElement", (sender, e) => { });
         }
 
 
@@ -501,6 +390,7 @@ namespace Solvers.Components.GPA.Variable
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
             pManager.AddParameter(new S_Param.Param_VariableSet(), "Set of variables", "S", "Set of variables initialised with the given values.", GH_Kernel.GH_ParamAccess.item);
+            pManager.AddParameter(new S_Param.Param_Variable(), "Variables", "V", "Variables composing the newly constructed Set.", GH_Kernel.GH_ParamAccess.list);
         }
 
 
@@ -509,7 +399,7 @@ namespace Solvers.Components.GPA.Variable
         {
             Message = null;
 
-            // If the component is expecting BRIDGES (compatibles) types, then the input must be a list.
+            // If the component's mode is set to BRIDGES, then the input must be a list.
             if (_configuration == ComponentConfiguration.BRIDGES & 1 < this.Params.Input[1].VolatileData.PathCount)
             {
                 this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Error, "The inputs must be a list.");
@@ -526,11 +416,38 @@ namespace Solvers.Components.GPA.Variable
         /// <inheritdoc cref="GH_Kernel.GH_Component.SolveInstance(GH_Kernel.IGH_DataAccess)"/>
         protected override void SolveInstance(GH_Kernel.IGH_DataAccess DA)
         {
-            if(!_isInputFormatValid) { return; }
+            /******************** Get Inputs ********************/
 
-            if (_configuration == ComponentConfiguration.Generic) { SolveInstance_Generic(DA); }
-            else if (_configuration == ComponentConfiguration.BRIDGES) { SolveInstance_BRIDGES(DA); }
+            string name = null;
+            DA.GetData(0, ref name);
+
+            if (!_isInputFormatValid) { return; }
+
+            /******************** Core ********************/
+
+            List<GP.Variable> set;
+
+            if (_configuration == ComponentConfiguration.Generic) { set = CreateSet_Generic(DA); }
+            else if (_configuration == ComponentConfiguration.BRIDGES) { set = CreateSet_BRIDGES(DA); }
             else { throw new NotImplementedException("The solve instance method for the given component mode is not implemented."); }
+
+            if(set is null) { return; }
+
+            /******************** Set Output ********************/
+
+            S_Types.Gh_VariableSet gh_Set = new S_Types.Gh_VariableSet(set, name);
+
+            List<S_Types.Gh_Variable> gh_Variables = new List<S_Types.Gh_Variable>(set.Count);
+
+            S_Types.Gh_Variable variable;
+            for (int i = 0; i < set.Count; i++)
+            {
+                variable = new S_Types.Gh_Variable(set[i]);
+                gh_Variables.Add(variable);
+            }
+
+            DA.SetData(0, gh_Set);
+            DA.SetDataList(1, gh_Variables);
         }
 
 
@@ -590,7 +507,7 @@ namespace Solvers.Components.GPA.Variable
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.CreateAttributes()"/>
         public override void CreateAttributes()
         {
-            m_attributes = new ComponentAttributes(this);
+            m_attributes = new Gh_Disp_Euc3D.ComponentAttributes(this);
         }
 
         #endregion
