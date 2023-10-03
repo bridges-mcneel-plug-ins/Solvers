@@ -1,31 +1,34 @@
 ﻿using System;
+using System.Collections.Generic;
 
 using GP = BRIDGES.Solvers.GuidedProjection;
-using Euc3D = BRIDGES.Geometry.Euclidean3D;
 
 using GH_Kernel = Grasshopper.Kernel;
+using GH_Data = Grasshopper.Kernel.Data;
+using GH_Types = Grasshopper.Kernel.Types;
 
 using Gh_Disp_Euc3D = BRIDGES.McNeel.Grasshopper.Display.Geometry.Euclidean3D;
 
 using Types_GPA = Solvers.Types.GPA;
 using Params_GPA = Solvers.Parameters.GPA;
+using Rhino.Geometry;
 
 
-namespace Solvers.Components.GPA
+namespace Solvers.Components.GPA.Variable
 {
     /// <summary>
-    /// A grasshopper component representing the solver for the Guided Projection Algorithm from its coordinates.
+    /// A grasshopper component creating a <see cref="Types_GPA.Gh_VariableSet"/>.
     /// </summary>
-    public class Comp_Solver : GH_Kernel.GH_Component
+    public class Comp_DeconstructSet : GH_Kernel.GH_Component
     {
         #region Constructors
 
         /// <summary>
-        /// Initialises a new instance of the <see cref="Comp_Solver"/> class.
+        /// Initialises a new instance of the <see cref="Comp_DeconstructSet"/> class.
         /// </summary>
-        public Comp_Solver()
-          : base("Guided Projection Algorithm Solver", "GPA",
-              "Solver for the Guided Projection Algorithm described by Tang et al. in \"Form-finding with Polyhedral Meshes Made Simple\".",
+        public Comp_DeconstructSet()
+          : base("Deconstruct Set", "Set",
+              "Deconstruct a set of variables into its numerical values.",
               Settings.CategoryName, Settings.SubCategoryName[Solvers.SubCategory.GPA])
         {
             /* Do Nothing */
@@ -39,62 +42,62 @@ namespace Solvers.Components.GPA
         /// <inheritdoc cref="GH_Kernel.GH_Component.RegisterInputParams(GH_InputParamManager)"/>
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
+            pManager.AddTextParameter("Set Name", "N", "Name of the set of variables to deconstruct", GH_Kernel.GH_ParamAccess.item);
             pManager.AddParameter(new Params_GPA.Param_Model(), "GPA Model", "M", "Assembled Model for the Guided Projection Algorithm.", GH_Kernel.GH_ParamAccess.item);
-            pManager.AddIntegerParameter("Iteration", "I", "Number of iteration of the solver.", GH_Kernel.GH_ParamAccess.item);
         }
 
         /// <inheritdoc cref="GH_Kernel.GH_Component.RegisterOutputParams(GH_OutputParamManager)"/>
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.AddParameter(new Params_GPA.Param_Model(), "GPA Model", "M", "Model for the Guided Projection Algorithm", GH_Kernel.GH_ParamAccess.item);
+            pManager.AddNumberParameter("Numerical Values", "N", "Numerical value representation of the variables in the specified set.", GH_Kernel.GH_ParamAccess.tree);
         }
+
 
         /// <inheritdoc cref="GH_Kernel.GH_Component.SolveInstance(GH_Kernel.IGH_DataAccess)"/>
         protected override void SolveInstance(GH_Kernel.IGH_DataAccess DA)
         {
-            // ----- Initialisation ----- //
+            // ----- Initialise ----- //
 
-            Types_GPA.Gh_Model gh_Model = new Types_GPA.Gh_Model();
-            int maxIteration = 0;
-
+            string name = "";
+            Types_GPA.Gh_Model model = new Types_GPA.Gh_Model();
 
             // ----- Get Inputs ----- //
 
-            if (!DA.GetData(0, ref gh_Model)) { return; }
-            if(gh_Model.Value is null)
-            {
-                this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Warning, "Input parameter M failed to collect data.");
-                DA.SetData(0, new Types_GPA.Gh_Model());
-                return;
-            }
+            DA.GetData(0, ref name);
+            DA.GetData(1, ref model);
 
-            if (!DA.GetData(1, ref maxIteration)) { return; }
-                        
             // ----- Core ----- //
 
-            gh_Model.Value.MaxIteration = maxIteration;
+            Grasshopper.DataTree<double> tree = new Grasshopper.DataTree<double>();
 
-            gh_Model.Value.InitialiseX();
-
-            for (int i = 0; i < gh_Model.Value.MaxIteration; i++)
+            if (model.Sets.TryGetValue(name, out List<GP.Variable> variables))
             {
-                gh_Model.Value.RunIteration(false);
+                for (int i = 0; i < variables.Count; i++)
+                {
+                    double[] array = variables[i].ToArray();
+                    tree.AddRange(array, new GH_Data.GH_Path(i));
+                }
+            }
+            else
+            {
+                this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Error, "The specified name does not correspond to any variable set i the model.");
+                return;
             }
 
             // ----- Set Output ----- //
 
-            DA.SetData(0, gh_Model);
+            DA.SetDataTree(0, tree);
+
         }
 
         #endregion
 
         #region Override : GH_DocumentObject
 
+        // ---------- Properties ---------- //
+
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.ComponentGuid"/>
-        public override Guid ComponentGuid
-        {
-            get { return new Guid("{4AEF4763-83CD-4C49-A80B-B5F5A728DC89}"); }
-        }
+        public override Guid ComponentGuid => new Guid("{87C3EAC8-D980-4D05-B54D-3E10FCC628C5}");
 
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.Icon"/>
         protected override System.Drawing.Bitmap Icon
@@ -106,10 +109,10 @@ namespace Solvers.Components.GPA
         }
 
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.Exposure"/>
-        public override GH_Kernel.GH_Exposure Exposure
-        {
-            get { return (GH_Kernel.GH_Exposure)TabExposure.Solver; }
-        }
+        public override GH_Kernel.GH_Exposure Exposure => (GH_Kernel.GH_Exposure)TabExposure.Variable;
+
+
+        // ---------- Methods ---------- //
 
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.CreateAttributes()"/>
         public override void CreateAttributes()

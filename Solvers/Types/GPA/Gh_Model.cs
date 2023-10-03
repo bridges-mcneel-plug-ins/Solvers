@@ -12,12 +12,22 @@ namespace Solvers.Types.GPA
     /// </summary>
     public class Gh_Model : GH_Types.GH_Goo<GP.GuidedProjectionAlgorithm>
     {
+        #region Fields
+
+        /// <summary>
+        /// Dictionnary containing the set of variables, identified by their name.
+        /// </summary>
+        public Dictionary<string, List<GP.Variable>> Sets;
+
+        #endregion
+
+
         #region Constructors
 
         /// <summary>
         /// Initialises a new instance of <see cref= "Gh_Model" /> class.
         /// </summary>
-        public Gh_Model() { }
+        public Gh_Model() { /* Do Nothing */ }
 
         /// <summary>
         /// Initialises a new instance of <see cref= "Gh_Model" /> class from another <see cref="Gh_Model"/>..
@@ -35,6 +45,17 @@ namespace Solvers.Types.GPA
         public Gh_Model(GP.GuidedProjectionAlgorithm gpa)
         {
             this.Value = gpa;
+        }
+
+        /// <summary>
+        /// Initialises a new instance of <see cref="Gh_Model"/> class from a <see cref="GP.GuidedProjectionAlgorithm"/>.
+        /// </summary>
+        /// <param name="gpa"> <see cref="GP.GuidedProjectionAlgorithm"/> for the grasshopper type.</param>
+        /// <param name="sets"> Sets of variables used in the Guided Projection Algorithm. </param>
+        public Gh_Model(GP.GuidedProjectionAlgorithm gpa, ref Dictionary<string, List<GP.Variable>> sets)
+        {
+            this.Value = gpa;
+            this.Sets = sets;
         }
 
         #endregion
@@ -88,7 +109,7 @@ namespace Solvers.Types.GPA
         /// <inheritdoc cref="GH_Types.GH_Goo{T}.ToString"/>
         public override string ToString()
         {
-            return $"(V:{Value.ComponentCount}, E:{Value.EnergyCount}, C:{Value.ConstraintCount})";
+            return Value is null ? "Empty Gh_Model parameter" : $"(V:{Value.ComponentCount}, E:{Value.EnergyCount}, C:{Value.ConstraintCount})";
         }
 
         #endregion

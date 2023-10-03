@@ -3,16 +3,12 @@ using System.Collections.Generic;
 
 using GP = BRIDGES.Solvers.GuidedProjection;
 
-using Gh_Types_Euc3D = BRIDGES.McNeel.Grasshopper.Types.Geometry.Euclidean3D;
-using Gh_Param_Euc3D = BRIDGES.McNeel.Grasshopper.Parameters.Geometry.Euclidean3D;
-
 using GH_Kernel = Grasshopper.Kernel;
 
 using Gh_Disp_Euc3D = BRIDGES.McNeel.Grasshopper.Display.Geometry.Euclidean3D;
 
 using Types_GPA = Solvers.Types.GPA;
 using Params_GPA = Solvers.Parameters.GPA;
-using Grasshopper.Documentation;
 
 
 namespace Solvers.Components.GPA
@@ -46,6 +42,9 @@ namespace Solvers.Components.GPA
             pManager.AddParameter(new Params_GPA.Param_VariableSet(), "Sets", "S", "Sets of variable used by the energies and constraints.", GH_Kernel.GH_ParamAccess.list);
             pManager.AddParameter(new Params_GPA.Param_Energy(), "Energies", "E", "Energies", GH_Kernel.GH_ParamAccess.list);
             pManager.AddParameter(new Params_GPA.Param_Constraint(), "Constraints", "C", "Constraints", GH_Kernel.GH_ParamAccess.list);
+
+            pManager[1].Optional = true;
+            pManager[2].Optional = true;
         }
 
         /// <inheritdoc cref="GH_Kernel.GH_Component.RegisterOutputParams(GH_OutputParamManager)"/>
@@ -59,15 +58,29 @@ namespace Solvers.Components.GPA
         {
             // ---------- Initialisation ---------- //
 
-            List<Types_GPA.Gh_VariableSet> gh_Sets = null;
-            List<Types_GPA.Gh_Energy> gh_Energies = null;
-            List<Types_GPA.Gh_Constraint> gh_Constraints = null;
+            List<Types_GPA.Gh_VariableSet> gh_Sets = new List<Types_GPA.Gh_VariableSet>();
+            List<Types_GPA.Gh_Energy> gh_Energies = new List<Types_GPA.Gh_Energy>();
+            List<Types_GPA.Gh_Constraint> gh_Constraints = new List<Types_GPA.Gh_Constraint>();
 
             // ---------- Get Inputs ---------- //
 
             if (!DA.GetDataList(0, gh_Sets)) { return; };
-            if (!DA.GetDataList(1, gh_Energies)) { return; };
-            if (!DA.GetDataList(2, gh_Constraints)) { return; };
+
+            bool hasEnergies = DA.GetDataList(1, gh_Energies);
+            bool hasConstraints = DA.GetDataList(2, gh_Constraints);
+            if ( (!hasEnergies || gh_Energies.Count == 0) & (!hasConstraints || gh_Constraints.Count == 0))
+            {
+                this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Warning, "Input parameters E and C failed to collect data. The model needs energies or constraint to run.");
+
+
+                this.Params.Output[0].Phase = GH_Kernel.GH_SolutionPhase.Blank;
+                this.Params.Output[0].ClearData();
+
+
+                // this.Params.Output[0].ExpireSolution(); ????
+
+                return;
+            }
 
             // ---------- Core ---------- //
 
@@ -77,26 +90,45 @@ namespace Solvers.Components.GPA
                 setVariableCount += gh_Set.Count;
             }
 
-            GP.GuidedProjectionAlgorithm gpa = new GP.GuidedProjectionAlgorithm(1e-8, 100);
+            GP.GuidedProjectionAlgorithm gpa = new GP.GuidedProjectionAlgorithm(1e-4, 100);
 
 
             // ---------- Variables ---------- //
 
-            // Dictionary containing:
-            // - Key : Variable defined by the user before the creation of the model.
-            // - Value : Varriable defined from the gpa model.
 
-            foreach(Types_GPA.Gh_VariableSet gh_Set in gh_Sets)
+            //
+            //  Il faut copier les variables pour de problème de reference a priori ...
+            //
+
+            // Key : Old Variables
+            // Value : Copied Variables
+            Dictionary<GP.Variable, GP.Variable> oldToNew = new Dictionary<GP.Variable, GP.Variable>(setVariableCount);
+
+
+            Dictionary<string, List<GP.Variable>> sets = new Dictionary<string, List<GP.Variable>>(gh_Sets.Count);
+
+
+            foreach (Types_GPA.Gh_VariableSet gh_Set in gh_Sets)
             {
-                foreach(GP.Variable userVariable in gh_Set)
+                List<GP.Variable> variables = new List<GP.Variable>(gh_Set.Count);
+                foreach(GP.Variable variable in gh_Set)
                 {
-                    bool isVariableAdded = gpa.TryAddVariable(userVariable);
-
-                    if(!isVariableAdded)
+                    if(oldToNew.ContainsKey(variable))
                     {
                         this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Warning, $"The set {gh_Set.Name} contains a variable that was already added to the model.");
                     }
+                    else
+                    {
+                        double[] components = variable.ToArray();
+                        GP.Variable newVariable = gpa.AddVariable(components);
+
+                        oldToNew.Add(variable, newVariable);
+
+                        variables.Add(newVariable);
+                    }
                 }
+
+                sets.Add(gh_Set.Name, variables);
             }
 
             // ---------- Energies ---------- //
@@ -104,20 +136,35 @@ namespace Solvers.Components.GPA
             foreach (Types_GPA.Gh_Energy gh_Energy in gh_Energies)
             {
                 IReadOnlyList<GP.Variable> variables = gh_Energy.Value.Variables;
+
+                List<GP.Variable> newVariables = new List<GP.Variable>(variables.Count);
+
                 foreach(GP.Variable variable in variables)
                 {
-                    bool isVariableAdded = gpa.TryAddVariable(variable);
-                    if (isVariableAdded)
+                    if(oldToNew.ContainsKey(variable))
+                    {
+                        GP.Variable newVariable = oldToNew[variable];
+                        newVariables.Add(newVariable);
+                    }
+                    else
                     {
                         this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Remark, $"A variable which does not belong to any set was added to the model. It might be a dummy variable.");
+
+                        double[] components = variable.ToArray();
+                        GP.Variable newVariable = gpa.AddVariable(components);
+
+                        oldToNew.Add(variable, newVariable);
+
+                        newVariables.Add(newVariable);
                     }
                 }
 
-                bool isEnergyAdded = gpa.TryAddEnergy(gh_Energy.Value);
-                if (!isEnergyAdded)
-                {
-                    this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Warning, $"This energy is a duplicate, it was already added to the model.");
-                }
+                gpa.AddEnergy(gh_Energy.Value.Type, newVariables, gh_Energy.Value.Weight);
+
+                // if (!isEnergyAdded)
+                // {
+                //     this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Warning, $"This energy is a duplicate, it was already added to the model.");
+                // }
             }
 
             // ---------- Constraints ---------- //
@@ -125,26 +172,57 @@ namespace Solvers.Components.GPA
             foreach (Types_GPA.Gh_Constraint gh_Constraint in gh_Constraints)
             {
                 IReadOnlyList<GP.Variable> variables = gh_Constraint.Value.Variables;
+
+                List<GP.Variable> newVariables = new List<GP.Variable>(variables.Count);
+
                 foreach (GP.Variable variable in variables)
                 {
-                    bool isVariableAdded = gpa.TryAddVariable(variable);
-                    if (isVariableAdded)
+                    if (oldToNew.ContainsKey(variable))
+                    {
+                        GP.Variable newVariable = oldToNew[variable];
+                        newVariables.Add(newVariable);
+                    }
+                    else
                     {
                         this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Remark, $"A variable which does not belong to any set was added to the model. It might be a dummy variable.");
+
+                        double[] components = variable.ToArray();
+                        GP.Variable newVariable = gpa.AddVariable(components);
+
+                        oldToNew.Add(variable, newVariable);
+
+                        newVariables.Add(newVariable);
                     }
                 }
 
-                bool isConstraintAdded = gpa.TryAddConstraint(gh_Constraint.Value);
-                if (!isConstraintAdded)
-                {
-                    this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Warning, $"This constraint is a duplicate, it was already added to the model.");
-                }
+                gpa.AddConstraint(gh_Constraint.Value.Type, newVariables, gh_Constraint.Value.Weight);
+
+                // if (!isConstraintAdded)
+                // {
+                //     this.AddRuntimeMessage(GH_Kernel.GH_RuntimeMessageLevel.Warning, $"This constraint is a duplicate, it was already added to the model.");
+                // }
             }
+
+            /******************** Run ********************/
+
+/*
+            gpa.MaxIteration = 20;
+
+            gpa.InitialiseX();
+
+            System.Threading.Thread.Sleep(1000);
+
+            for (int i = 0; i < gpa.MaxIteration; i++)
+            {
+                gpa.RunIteration(false);
+            }
+*/
 
             /******************** Set Output ********************/
 
-            Types_GPA.Gh_Model gh_Model = new Types_GPA.Gh_Model(gpa);
-            DA.SetData(0, gpa);
+            Types_GPA.Gh_Model gh_Model = new Types_GPA.Gh_Model(gpa, ref sets);
+
+            DA.SetData(0, gh_Model);
         }
 
         #endregion

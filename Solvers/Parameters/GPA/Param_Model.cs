@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 using GH_Kernel = Grasshopper.Kernel;
 
@@ -34,11 +35,19 @@ namespace Solvers.Parameters.GPA
                 Settings.CategoryName, Settings.SubCategoryName[Solvers.SubCategory.Parameters], GH_Kernel.GH_ParamAccess.item)
         {
             /* Do Nothing */
+            
         }
 
         #endregion
 
+        
 
+        // protected override Types_GPA.Gh_Model PreferredCast(object data)
+        // {
+        //     return base.PreferredCast(data); // To GPA model
+        // }
+
+        
         #region Override : GH_DocumentObject
 
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.ComponentGuid"/>
@@ -49,8 +58,7 @@ namespace Solvers.Parameters.GPA
 
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.Icon"/>
         protected override System.Drawing.Bitmap Icon => null;
-
-
+        
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.CreateAttributes()"/>
         public override void CreateAttributes()
         {
@@ -73,7 +81,7 @@ namespace Solvers.Parameters.GPA
                 }
             }
         }
-
+                
         #endregion
     }
 }

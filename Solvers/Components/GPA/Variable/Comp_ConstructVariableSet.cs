@@ -16,12 +16,13 @@ using Gh_Disp_Euc3D = BRIDGES.McNeel.Grasshopper.Display.Geometry.Euclidean3D;
 using S_Types = Solvers.Types.GPA;
 using S_Param = Solvers.Parameters.GPA;
 
+
 namespace Solvers.Components.GPA.Variable
 {
     /// <summary>
     /// A grasshopper component creating a <see cref="S_Types.Gh_VariableSet"/>.
     /// </summary>
-    public class Comp_ConstructVariableSet : GH_Kernel.GH_Component
+    internal class Comp_ConstructVariableSet : GH_Kernel.GH_Component
     {
         /// <summary>
         /// Enum type giving different configuration for the component

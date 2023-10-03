@@ -17,7 +17,7 @@ using Params_GPA = Solvers.Parameters.GPA;
 namespace Solvers.Components.GPA.Energy
 {
     /// <summary>
-    /// A grasshopper component creating a <see cref="EnergyTypes.SegmentParallelity"/>.
+    /// A grasshopper component creating a <see cref="EnergyTypes.SegmentParallelity"/>-based <see cref="GP.Energy"/>.
     /// </summary>
     public class Comp_SegmentParallelity : GH_Kernel.GH_Component
     {
@@ -35,6 +35,7 @@ namespace Solvers.Components.GPA.Energy
         }
 
         #endregion
+
 
         #region Override : GH_Component
 
