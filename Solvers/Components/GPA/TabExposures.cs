@@ -14,6 +14,7 @@ namespace Solvers.Components.GPA
         Energy = GH_Kernel.GH_Exposure.secondary,
         Constraint = GH_Kernel.GH_Exposure.tertiary,
         Solver = GH_Kernel.GH_Exposure.quarternary,
+        Nexorade = GH_Kernel.GH_Exposure.quinary,
     }
 }
  

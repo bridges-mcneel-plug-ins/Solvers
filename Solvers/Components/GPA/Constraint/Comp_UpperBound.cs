@@ -43,7 +43,7 @@ namespace Solvers.Components.GPA.Constraint
 
             pManager.AddNumberParameter("Weight", "W", "Weight of the constraint.", GH_Kernel.GH_ParamAccess.item);
 
-            pManager[3].Optional = true;
+            pManager[2].Optional = true;
         }
 
         /// <inheritdoc cref="GH_Kernel.GH_Component.RegisterOutputParams(GH_OutputParamManager)"/>

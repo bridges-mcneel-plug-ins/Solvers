@@ -105,7 +105,7 @@ namespace Solvers.Components.GPA.Energy
         #region Override : GH_DocumentObject
 
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.ComponentGuid"/>
-        public override Guid ComponentGuid => new Guid("{9FC632E5-85B5-4857-84D8-B1B22FE7D7FC}");
+        public override Guid ComponentGuid => new Guid("{4F5A0AE6-807B-4A65-A5E1-A7C848022A03}");
 
         /// <inheritdoc cref="GH_Kernel.GH_DocumentObject.Exposure"/>
         public override GH_Kernel.GH_Exposure Exposure => (GH_Kernel.GH_Exposure)TabExposure.Energy;
